@@ -7,7 +7,13 @@ import scala.util.parsing.combinator._
 import scala.collection.mutable
 
 /**
- * Created by jeremy on 2/8/14.
+ * Created by vincent on 2/8/14.
+ *
+ * data_length : data length to test at the end of each time series
+ * time : time at which we want to find trending items (eventually simply the last item of each series)
+ * result_length : number of trending items to show (eventually, simply show all items with a score above 1).
+ * influence : influence radius of each sample
+ * samples : directory of the samples
  */
 class TwitterTrendDetection(args: Args) extends Job(args) {
 
@@ -15,31 +21,11 @@ class TwitterTrendDetection(args: Args) extends Job(args) {
     def apply(s: String) = parse("List(" ~> repsep("\\d+(\\.\\d*)".r ^^ (_.toDouble), ",")  <~ ")", s)
   }
 
-    //Enhancement
-  // - Vertical stretching
-  // - Horizontal stretching
-
-
   /////////////////ALGO PARAMS
-  /**
-   * Number of points in the time series to use
-   */
-  val data_length = 7
-
-  /**
-   * Position in the time series (usually the end, but for testing purpose).
-   */
-  val t = 48
-
-  /**
-   * Number of trending items to display
-   */
-  val result_length = 20
-
-  /**
-   * Sphere of influence of each sample.
-   */
-  val y =20;
+  val data_length = args("data_length").toInt
+  val t = args("time").toInt
+  val result_length = args("result_length").toInt
+  val y = args("influence").toDouble;
 
   ///////////////////////////////////////////////////////
   //---------- Read Input
@@ -104,7 +90,8 @@ class TwitterTrendDetection(args: Args) extends Job(args) {
       val id = x._1
       val trending_vote = x._2
       val not_trending_vote = x._3
-
+      //println(trending_vote)
+      //println(not_trending_vote)
       (id, trending_vote / not_trending_vote)
   }.groupAll{
     _.sortedReverseTake[(Double, String)](('trending_factor, 'id) -> 'top, 250)
@@ -116,7 +103,9 @@ class TwitterTrendDetection(args: Args) extends Job(args) {
   ///////////////////////////////////////////////////////
 
   val output = Csv(p = args("output"), separator = "\t")
-  results.write(output)
+  results.joinWithLarger('id -> 'id, time_series)
+    .groupAll{_.sortBy('trending_factor)}
+    .write(output)
 
 
   ///////////////////////////////////////////////////////
@@ -133,8 +122,8 @@ class TwitterTrendDetection(args: Args) extends Job(args) {
 
       min_dist = math.min(dist, min_dist)
     }
-
-    return math.log(y * min_dist)
+    //println(min_dist)
+    return min_dist
   }
 
 
@@ -148,7 +137,11 @@ class TwitterTrendDetection(args: Args) extends Job(args) {
       val speedo : Double= no(i+1) - no(i)
       sum += EuclideanDistance(speeds,speedo)
      }*/
-    return /*sum*/ (s, o).zipped.map(EuclideanDistance(_, _)).sum
+    var summ = 0.0
+    for ( (as, ao) <- (s zip o)){
+      summ += math.exp(-y *EuclideanDistance(as, ao))
+    }
+    return summ
   }
 
   def NormalizeList(l:List[Double]) : List[Double] = {

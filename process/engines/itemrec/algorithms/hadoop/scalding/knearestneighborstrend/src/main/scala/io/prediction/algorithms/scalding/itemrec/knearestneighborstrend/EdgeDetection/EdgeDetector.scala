@@ -38,7 +38,8 @@ class EdgeDetector(window_h: Integer, window_w: Integer, threshold: Double, valu
     val h_average = applyThreshold(windowH.sum / window_h)
     val w_average = applyThreshold(windowW.sum / window_w)
 
-    val result = w_average - h_average
+    var result = w_average - h_average
+
     return result
   }
 

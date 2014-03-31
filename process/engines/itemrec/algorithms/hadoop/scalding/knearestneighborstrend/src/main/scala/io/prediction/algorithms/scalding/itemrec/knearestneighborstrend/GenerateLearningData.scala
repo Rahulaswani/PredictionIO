@@ -5,6 +5,15 @@ import scala.collection.mutable
  * Created by vincent on 2/16/14.
  */
 
+/**
+ * input : relative path to the training data.
+ * threshold : value under which we consider data to be irrelevant (same as 0).
+ * h_window : length of data for the first average (for edge detection).
+ * w_window : length of data for the second average (for edge detection)
+ * sample_length : length of one trending sample
+ * result_length : number of trending and not trending samples
+ * @param args
+ */
 class GenerateLearningData(args: Args) extends Job(args) {
 
   /////////////////INPUT FORMAT PARAMS
@@ -15,16 +24,16 @@ class GenerateLearningData(args: Args) extends Job(args) {
   /**
    * Under that number, will say that it is irrelevant.
    */
-  val threshold = 10
+  val threshold = args("threshold").toDouble
 
   //Window 1 size
-  val h =  7
+  val h =  args("h_window").toInt
   //Window 2 size
-  val w =  4
+  val w =  args("w_window").toInt
 
   /////////////////GENERATED SAMPLES FORMAT PARAMS
-  val sample_length = 9;
-  val result_length = 300;
+  val sample_length = args("sample_length").toInt;
+  val result_length = args("result_length").toInt;
 
   //------- Compute edges factor curves
   val trending_curves =
@@ -69,11 +78,18 @@ class GenerateLearningData(args: Args) extends Job(args) {
 
           //Contains a time series portion. These
           val samples:List[Double] = values.slice(i - sample_length, i)
-          result += ((trending_factor_curve(i), samples))
+
+          //Trick to avoid having a list of 0 as a sample list
+          if (samples.sum < threshold) {
+            result += ((0, samples))
+          }
+          else {
+            result += ((trending_factor_curve(i), samples))
+          }
+
 
           //println("length " + trending_factor_curve(i) + " samples : " + values)
         }
-
         result.toList
     }
 
